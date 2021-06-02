@@ -34,5 +34,16 @@ If you would like to run our DKT baseline, you should instead use src/dkt/genera
 
     python generate_dkt_features.py --max_seq_len 200
 
+## Encoding features for DAS3H
 
-## 
+## Running our models
+
+Note that before running DKT or DAS3H with word embeddings, you must use src/process_fastword_embeddings.py to retrieve all the necessary word embeddings for the dataset. This requires the [fasttext python module](https://pypi.org/project/fasttext/) and the relevant language models from [fasttext](https://fasttext.cc/docs/en/crawl-vectors.html).
+
+    python process_fastword_embeddings.py
+
+
+
+To run DKT, use src/dkt/train_dkt.py. You can optionally choose to freeze or finetune word embeddings. You can also run without pretrained word embeddings by not setting the embeddings_file option. You can set the hyperparameters that you want to use within the code, and optionally use the grid_search option to perform a hyperparameter search.
+
+    python train_dkt.py --grid_search --embeddings_file path/to/embeddings_all_word_embeddings_fastword.npy --freeze_embeddings
