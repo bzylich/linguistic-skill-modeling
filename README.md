@@ -37,11 +37,16 @@ If you would like to run our subword model, you will need to use the following o
     python prepare_data.py --dataset duolingo_hlr --min_interactions 0 --continuous_correct --subword_skills --tokenizer_dir ./vocab/ --vocab_size 5000 --nbest 2
 
 
-If you would like to run our DKT baseline, you should instead use src/dkt/generate_dkt_features.py to prepare the data.
+If you would like to run our neural embedding similarity variant of DAS3H or the DKT baseline, you should instead use src/dkt/generate_dkt_features.py to prepare the data.
 
     python generate_dkt_features.py --max_seq_len 200
 
 ## Encoding features for DAS3H
+
+To encode data for our das3h models without word embeddings, use the following command (using src/das3h/fast_encode.py). Note that again the --lemma and --tags options are optional. Note that this script expects the preprocessed data to be in the src/das3h/data/duolingo_hlr/ directory. The outputs will also be saved to this directory.
+
+    python fast_encode.py --dataset duolingo_hlr --tw --continuous_correct --continuous_wins --users --items --skills --max_history_len 200 --tags --lemma
+     
 
 ## Running our models
 
@@ -49,7 +54,13 @@ Note that before running DKT or DAS3H with word embeddings, you must use src/pro
 
     python process_fastword_embeddings.py
 
+To run das3h using the basic DAS3H variants, use src/das3h/das3h.py.
 
+    
+
+To run our neural embedding similarity DAS3H variant, use src/das3h/das3h_neural_embeddings.py.
+
+    python das3h_neural_embeddings.py
 
 To run DKT, use src/dkt/train_dkt.py. You can optionally choose to freeze or finetune word embeddings. You can also run without pretrained word embeddings by not setting the embeddings_file option. You can set the hyperparameters that you want to use within the code, and optionally use the grid_search option to perform a hyperparameter search.
 
