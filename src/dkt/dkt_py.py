@@ -17,18 +17,14 @@ def loss_with_z_term(loss_fn, z_hat, y, class_weights=None, seen=None, z_weight=
     y_clamp = torch.clamp(y, eps, 1.0 - eps)
     z = torch.log(y_clamp / (1-y_clamp))
 
-    # y_view = y.view(-1, 1)
     if seen is not None:
         return (loss_fn(z_hat, y).flatten() + z_weight * torch.square(z - z_hat).flatten()) * seen
     else:
         if class_weights is not None:
             weight_indices = torch.floor(y / 0.1).long().view(-1)
             weight_indices[weight_indices == 10] = 9
-            # print(weight_indices.size(), flush=True)
             class_weights_to_apply = class_weights[weight_indices]
-            # print(class_weights_to_apply.size(), flush=True)
             loss_intermediate = loss_fn(z_hat, y).view(-1) + z_weight * torch.square(z - z_hat).view(-1)
-            # print(loss_intermediate.size(), flush=True)
             return loss_intermediate * class_weights_to_apply
         return loss_fn(z_hat, y) + z_weight * torch.square(z - z_hat)
 
@@ -65,16 +61,10 @@ class DKT(nn.Module):
         )
 
         if pretrained_embeddings is not None:
-            # self.reset()
             print("embeddings frozen:", freeze_pretrained, flush=True)
             self.q_embed = nn.Embedding.from_pretrained(pretrained_embeddings, padding_idx=0, freeze=freeze_pretrained)
         else:
             self.q_embed = nn.Embedding(self.n_question, embed_l, padding_idx=0)
-            # self.reset()
-
-    # def reset(self):
-    #     for p in self.parameters():
-    #         torch.nn.init.constant_(p, 0.)
 
     def forward(self, q_data, correct_data, attempts_data, time_bin_data, target, mask):
         """
@@ -91,16 +81,10 @@ class DKT(nn.Module):
 
         rnn_input = torch.cat([q_embed_data, time_bin_categorical, torch.unsqueeze(correct_data, 2), torch.unsqueeze(attempts_data, 2)], dim=2)
         hidden_seq, _ = self.rnn(rnn_input, h_0)
-        # print(h_0.size(), hidden_seq.size(), flush=True)
         h = torch.cat([h_0[-1:, :, :], hidden_seq], dim=0)[:-1, :, :]  # T,BS,hidden_dim
-        # print(h.size(), flush=True)
-        # print(q_embed_data.size(), time_bin_categorical.size(), flush=True)
         ffn_input = torch.cat([h, q_embed_data, time_bin_categorical], dim=2)  # concatenate time-shifted hidden states with current question info
 
         pred = self.out(ffn_input)  # Size (Seqlen, BS, n_question+1)
-        # pred = pred.view(-1, self.n_question)
-        # qs = q_data.view(-1)
-        # pred = pred[torch.arange(batch_size*sl, device=device), qs]
 
         labels = target.view(-1)
         m = nn.Sigmoid()
@@ -112,8 +96,5 @@ class DKT(nn.Module):
         masked_preds = preds[mask]
 
         loss = nn.BCEWithLogitsLoss(reduction='none')
-        # loss = nn.MSELoss()
-        # out = loss(masked_preds, masked_labels)
         out = loss_with_z_term(loss, masked_preds, masked_labels, class_weights=self.class_weights, z_weight=self.z_weight)
         return out, m(preds), mask.sum()
-        # return out, torch.clamp(preds, 0.0, 1.0), mask.sum()

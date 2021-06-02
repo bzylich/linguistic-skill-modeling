@@ -14,7 +14,7 @@ scaler = torch.cuda.amp.GradScaler()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("device being used:", device, flush=True)
 
-parser = argparse.ArgumentParser(description='Run DAS3H.')
+parser = argparse.ArgumentParser(description='Run DKT.')
 parser.add_argument('--embeddings_file', type=str, nargs='?', default=None)
 parser.add_argument('--out_filename', type=str, nargs='?', default='dkt_model.pt')
 parser.add_argument('--freeze_embeddings', type=bool, nargs='?', const=True, default=False)
