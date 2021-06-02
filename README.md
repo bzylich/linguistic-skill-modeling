@@ -6,6 +6,13 @@ The data we use can be [downloaded](https://dataverse.harvard.edu/dataset.xhtml?
 
 Some of the code in this repository is based on code from [Benoît Choffin](https://github.com/BenoitChoffin)'s [DAS3H repository](https://github.com/BenoitChoffin/das3h).
 
+## Dependencies
+- Python 3
+- [PyTorch](https://pytorch.org/)
+- [numpy](https://numpy.org/)
+- [scipy](https://www.scipy.org/)
+- [sklearn](https://scikit-learn.org/stable/install.html)
+
 ## Running the baselines
 Use src/hlr.py to run the baselines from [Duolingo's repository](https://github.com/duolingo/halflife-regression).
 
