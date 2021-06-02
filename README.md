@@ -20,22 +20,19 @@ Models include hlr, lr, leitner, and pimsleur.
 
 To prepare data for our models, use the following command (using src/das3h/prepare_data.py). Note that the --lemma and --tags options are optional. These correspond to using the lemma form of words and including linguistic tags, respectively. You may also have to change the path to the dataset in the script.
 
-'''
-python prepare_data.py --dataset duolingo_hlr --min_interactions 0 --continuous_correct --lemma --tags
 
-'''
+    python prepare_data.py --dataset duolingo_hlr --min_interactions 0 --continuous_correct --lemma --tags
 
 If you would like to run our subword model, you will need to use the following options instead. In addition, you must run src/train_tokenizer.py first to generate the subword tokenizers. This also requires that you create a "vocab" subfolder within "src/das3h".
 
-'''
-python train_tokenizer.py
-python prepare_data.py --dataset duolingo_hlr --min_interactions 0 --continuous_correct --subword_skills --tokenizer_dir ./vocab/ --vocab_size 5000 --nbest 2
 
-'''
+    python train_tokenizer.py
+    python prepare_data.py --dataset duolingo_hlr --min_interactions 0 --continuous_correct --subword_skills --tokenizer_dir ./vocab/ --vocab_size 5000 --nbest 2
+
 
 If you would like to run our DKT baseline, you should instead use src/dkt/generate_dkt_features.py to prepare the data.
-'''
-python generate_dkt_features.py --max_seq_len 200
-'''
+
+    python generate_dkt_features.py --max_seq_len 200
+
 
 ## 
