@@ -16,9 +16,7 @@ Some of the code in this repository is based on code from [Benoît Choffin](http
 ## Running the baselines
 Use src/hlr.py to run the baselines from [Duolingo's repository](https://github.com/duolingo/halflife-regression).
 
-'''
-python hlr.py path/to/learning_traces.13m.csv -m [MODEL_NAME]
-'''
+    python hlr.py path/to/learning_traces.13m.csv -m [MODEL_NAME]
 
 Models include hlr, lr, leitner, and pimsleur.
 
