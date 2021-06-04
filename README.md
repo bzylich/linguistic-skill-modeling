@@ -24,6 +24,9 @@ Models include hlr, lr, leitner, and pimsleur.
 
 
 ## Preparing the data for our models
+If you plan to run DKT or DAS3H with word embeddings, you must use src/process_fastword_embeddings.py to retrieve all the necessary word embeddings for the dataset. This requires the [fasttext python module](https://pypi.org/project/fasttext/) and the relevant language models from [fasttext](https://fasttext.cc/docs/en/crawl-vectors.html).
+
+    python process_fastword_embeddings.py
 
 To prepare data for our models, use the following command (using src/das3h/prepare_data.py). Note that the --lemma and --tags options are optional. These correspond to using the lemma form of words and including linguistic tags, respectively. You may also have to change the path to the dataset in the script.
 
@@ -43,20 +46,27 @@ If you would like to run our neural embedding similarity variant of DAS3H or the
 
 ## Encoding features for DAS3H
 
+If you are using DKT or the neural embedding similarity approaches, you can skip this step.
+
 To encode data for our das3h models without word embeddings, use the following command (using src/das3h/fast_encode.py). Note that again the --lemma and --tags options are optional. Note that this script expects the preprocessed data to be in the src/das3h/data/duolingo_hlr/ directory. The outputs will also be saved to this directory.
 
-    python fast_encode.py --dataset duolingo_hlr --tw --continuous_correct --continuous_wins --users --items --skills --max_history_len 200 --tags --lemma
+    python fast_encode.py --dataset duolingo_hlr --tw --continuous_correct --continuous_wins --users --items --skills --l1 --max_history_len 200 --tags --lemma
      
+To encode data using subwords use the following command (using src/das3h/fast_encode.py). You can change the vocab_size and nbest options to match what you chose when training the subword tokenizers.
+
+    python fast_encode.py --dataset duolingo_hlr --tw --continuous_correct --continuous_wins --users --items --skills --l1 --max_history_len 200 --subword_skills --vocab_size 5000 --nbest 2 
+
+To encode data using the cosine embedding similarity DAS3H variant, you should use src/das3h/fast_encode_sim_matrix.py. Note that you must first construct a similarity matrix with src/generate_sim_matrix_fastword.py.
+
+    python generate_sim_matrix_fastword.py --embeddings_file all_word_embeddings_fastword.csv --out_file sim_matrix_fastword
+    
+    python fast_encode_sim_matrix.py sim_matrix_filename_without_file_extension --dataset duolingo_hlr --tw --users --items --skills --l1 --continuous_correct --continuous_wins
 
 ## Running our models
 
-Note that before running DKT or DAS3H with word embeddings, you must use src/process_fastword_embeddings.py to retrieve all the necessary word embeddings for the dataset. This requires the [fasttext python module](https://pypi.org/project/fasttext/) and the relevant language models from [fasttext](https://fasttext.cc/docs/en/crawl-vectors.html).
+To run das3h using the DAS3H variants (except neural embedding similarity), use src/das3h/das3h.py.
 
-    python process_fastword_embeddings.py
-
-To run das3h using the basic DAS3H variants, use src/das3h/das3h.py.
-
-    
+    python das3h.py path/to/data/encoded_data_filename.npz --dataset duolingo_hlr --duo_split --continuous_correct --d 0
 
 To run our neural embedding similarity DAS3H variant, use src/das3h/das3h_neural_embeddings.py.
 
