@@ -54,11 +54,13 @@ To encode data using subwords use the following command (using src/das3h/fast_en
 
     python fast_encode.py --dataset duolingo_hlr --tw --continuous_correct --continuous_wins --users --items --skills --l1 --max_history_len 200 --subword_skills --vocab_size 5000 --nbest 2 
 
-To encode data using the cosine embedding similarity DAS3H variant, you should use src/das3h/fast_encode_sim_matrix.py. Note that you must first construct a similarity matrix with src/generate_sim_matrix_fastword.py.
+To encode data using the cosine embedding similarity DAS3H variant, you should use src/das3h/fast_encode_sim_matrix.py. Note that you must first construct a similarity matrix with src/generate_sim_matrix_fastword.py. If you want to apply different temperature settings to the similarity matrix, you can do that with src/sim_matrix_temperature.py.
 
     python generate_sim_matrix_fastword.py --embeddings_file all_word_embeddings_fastword.csv --out_file sim_matrix_fastword
     
-    python fast_encode_sim_matrix.py sim_matrix_filename_without_file_extension --dataset duolingo_hlr --tw --users --items --skills --l1 --continuous_correct --continuous_wins
+    python sim_matrix_temperature.py --sim_file sim_matrix_filepath_without_file_extension --cosine
+    
+    python fast_encode_sim_matrix.py sim_matrix_filepath_without_file_extension --dataset duolingo_hlr --tw --users --items --skills --l1 --continuous_correct --continuous_wins
 
 ## Running our models
 
