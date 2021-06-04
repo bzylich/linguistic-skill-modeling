@@ -1,8 +1,6 @@
 import numpy as np
-import argparse
 import time
 import copy
-import pickle
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,9 +14,6 @@ print("device being used:", device, flush=True)
 
 def to_categorical(y, num_classes):
     """ 1-hot encodes a tensor """
-    # return_val = torch.zeros(y.size()[0], num_classes, device=device)
-    # return_val[:, y] = 1
-    # return return_val
     return F.one_hot(y, num_classes)
 
 
@@ -94,21 +89,14 @@ class DuoDataset(torch.utils.data.Dataset):
 
 
 def process_batch(batch, z_weight):
-    # with torch.cuda.amp.autocast():
-    # print("to categorical user")
     users = to_categorical(batch['users'].long().to(device).view(-1), max_user+1)
-    # print("to categorical item")
     items = to_categorical(batch['items'].long().to(device).view(-1), max_item+1)
-    # print("to categorical lang")
     langs = to_categorical(batch['langs'].long().to(device).view(-1), max_lang+1)
     skills = batch['skills'].long().to(device)
     timestamps = batch['timestamps'].to(device)
     targets = batch['targets'].to(device)
     mask = batch['mask'].bool().to(device)
     loss, outputs, labels = model(users, items, langs, skills, timestamps, targets, mask, z_weight=z_weight)
-    # outputs = outputs.view(-1)
-    # targets = targets.view(-1)
-    # loss = scaler.scale(loss)
     return labels, loss, outputs
 
 
@@ -131,11 +119,6 @@ def evaluate(data_loader, model, z_weight, return_outputs=False):
                 all_labels = torch.cat((all_labels, targets), dim=0)
                 all_preds = torch.cat((all_preds, outputs), dim=0)
                 all_loss += loss.sum()
-
-            # if batch_i % 800 == 0:
-            #     print("eval batch", batch_i, "out of", len(data_loader), flush=True)
-            #     # print(all_loss)
-            #     # print(total_count)
 
         out_loss = float(all_loss) / float(total_count)
         all_labels = all_labels.cpu()
@@ -200,15 +183,12 @@ class LogisticRegression(nn.Module):
 
         self.history_indices = torch.arange(history_len, device=device).repeat(history_len, 1)
         history_mask = (1 - torch.triu(torch.ones(history_len, history_len, device=device))) == 1
-        # print(history_mask)
 
         self.history_indices_selected = self.history_indices[history_mask]
-        # print(self.history_indices_selected)
         self.adjusted_history_len = self.history_indices_selected.size()[0]
 
         self.skill_indices = torch.ones(history_len, history_len, dtype=torch.long, device=device) * torch.arange(history_len, dtype=torch.long, device=device).view(-1, 1)
         self.skill_indices = self.skill_indices[history_mask]
-        # print(self.skill_indices)
 
         self.sum_indices = torch.sum(torch.cat((self.history_indices * history_mask.long(), torch.arange(history_len, device=device).unsqueeze(0)), dim=0), dim=1)
 
@@ -217,95 +197,61 @@ class LogisticRegression(nn.Module):
         time_categories[skill_padding_mask] = 0
         time_categories[hist_skill_padding_mask] = 0
         return to_small_categorical(time_categories.long(), self.time_bins.size()[0]+2)
-        # return None
 
     def compute_correct_total(self, skills, timestamps, targets):
         num_examples, history_len = skills.size()
         assert history_len == self.history_len
 
-        # print("converting to embeddings...")
         skill_embeddings = self.embeddings(skills).float()
-        # print("getting historical embeddings...", self.history_indices_selected.size())
         hist_skill_embeddings = skill_embeddings[:, self.history_indices_selected].view(-1, self.emb_size)
-        # print(hist_skill_embeddings.size())
 
-        # print("copying skills to correspond with historical embeddings...", self.skill_indices.size())
         skill_embeddings = skill_embeddings[:, self.skill_indices].view(-1, self.emb_size)
-        # print(skill_embeddings.size())
 
         hist_times = timestamps[:, self.history_indices_selected].view(-1, 1)
         skill_times = timestamps[:, self.skill_indices].view(-1, 1)
         padding_mask = (skills == 0)
         delta_t = self.categorize_time(skill_times - hist_times, padding_mask[:, self.skill_indices].view(-1), padding_mask[:, self.history_indices_selected].view(-1))
 
-        # print("concatenating input to embedding nn...")
         concat_emb = torch.cat((skill_embeddings, hist_skill_embeddings, delta_t), dim=1)
-        # concat_emb = torch.cat((skill_embeddings, hist_skill_embeddings), dim=1)
 
-        # print("embedding projection to sim score...")
         hist_similarities = self.emb_sim_activation(self.emb_sim(self.drop2(F.relu(self.emb_h2(self.drop1(F.relu(self.emb_h1(concat_emb)))))))).view(num_examples, self.adjusted_history_len)
 
-        # print("getting total and correct scores...")
         total_correct_features = torch.zeros(num_examples * self.history_len, 2 * self.num_skills, dtype=torch.float32, device=device)
 
         flat_skills = skills.view(-1, 1)
         padding_mask = (flat_skills != 0).float()
 
-        # print(self.sum_indices)
-        # print(hist_similarities)
         total_cumsum = torch.cumsum(hist_similarities, dim=1)
         zero_col = torch.zeros(num_examples, 1, device=device)
         total_cumsum = torch.cat((zero_col, total_cumsum), dim=1)
-        # print(total_cumsum.size())
         ub = total_cumsum[:, self.sum_indices[1:]]
-        # # print(ub.size())
         lb = total_cumsum[:, self.sum_indices[:-1]]
-        # print(lb.size())
-        # print(skills.size())
-        # print((ub - lb).view(-1))
-        # total_correct_features[:, flat_skills] = (ub - lb).view(-1)
         if self.sum_log_relu:
             total_correct_features.scatter_(1, flat_skills, torch.log1p(F.relu((ub - lb).view(-1, 1))) * padding_mask)
         else:
             total_correct_features.scatter_(1, flat_skills, (ub - lb).view(-1, 1) * padding_mask)
 
-
-        # print(hist_similarities.size())
-        # print(targets.size(), targets[:, self.history_indices_selected].size(), hist_similarities.dtype, targets.dtype)
         correct_similarities = hist_similarities * targets[:, self.history_indices_selected]
-        # print(correct_similarities)
         total_cumsum = torch.cumsum(correct_similarities.float(), dim=1)
         total_cumsum = torch.cat((zero_col, total_cumsum), dim=1)
         ub = total_cumsum[:, self.sum_indices[1:]]
         lb = total_cumsum[:, self.sum_indices[:-1]]
-        # print(ub - lb)
-        # total_correct_features[:, flat_skills+self.num_skills] = (ub - lb).view(-1)
         if self.sum_log_relu:
             total_correct_features.scatter_(1, flat_skills+self.num_skills, torch.log1p(F.relu((ub - lb).view(-1, 1))) * padding_mask)
         else:
             total_correct_features.scatter_(1, flat_skills+self.num_skills, (ub - lb).view(-1, 1) * padding_mask)
-        # print(torch.sum(total_correct_features, dim=1))
-        # print(torch.sum(total_correct_features, dim=0))
-        # print("-----")
 
         return total_correct_features
 
     def forward(self, users, items, langs, skills, timestamps, targets, mask, z_weight=0.0):
         num_examples, seqlen = skills.size()
-        # concat_features = torch.cat((torch.repeat_interleave(users, seqlen, dim=0), items, langs, to_categorical(skills.view(-1), self.num_skills)), dim=1)  # num_examples x (num_features)
-        # print("entering total/correct computation...")
+
         total_correct_intermediate = self.compute_correct_total(skills, timestamps, targets)
-        # print("exiting total/correct computation...")
 
-        # print(concat_features.size(), total_correct_intermediate.size())
         concat_features = torch.cat((torch.repeat_interleave(users, seqlen, dim=0), items, langs, to_categorical(skills.view(-1), self.num_skills), total_correct_intermediate), dim=1)  # num_examples x (num_features)
-        # concat_features = torch.cat((concat_features, total_correct_intermediate), dim=1)  # num_examples x (num_features + num_count_features)
 
-        # print("performing final linear projection...")
         logits = self.linear(concat_features)
         loss_function = nn.BCEWithLogitsLoss(reduction='none')
-
-        # print("calculating masked loss...")
 
         mask = mask.view(-1)
         preds = logits.view(-1)[mask]
@@ -324,8 +270,6 @@ if __name__ == "__main__":
     out_filename = data_dir + "das3h_neural_embeddings_2_"+str(history_len)+"_log1p="+str(sum_log_relu)+".pt"
     data_dir = "../dkt/"
     load_model = None
-
-    # scaler = torch.cuda.amp.GradScaler()
 
     modifier = "_" + str(history_len)  # "__continuous_continuous_wins_windows=[]_no_bias_all_word_embeddings_fastword"
     dev_dataset = DuoDataset(data_dir, "dev_users"+modifier+".npy", "dev_items"+modifier+".npy",
@@ -385,9 +329,9 @@ if __name__ == "__main__":
         n_question, embed_dim = 14003, 300
 
     real_batch_size = 10
-    train_loader = DataLoader(train_dataset, batch_size=real_batch_size, shuffle=True)  # , collate_fn=pad_batch
-    dev_loader = DataLoader(dev_dataset, batch_size=real_batch_size)  # , collate_fn=pad_batch
-    test_loader = DataLoader(test_dataset, batch_size=real_batch_size)  # , collate_fn=pad_batch
+    train_loader = DataLoader(train_dataset, batch_size=real_batch_size, shuffle=True)
+    dev_loader = DataLoader(dev_dataset, batch_size=real_batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=real_batch_size)
 
     train_batch_length = len(train_loader)
     print("train batches:", train_batch_length, flush=True)
@@ -410,7 +354,7 @@ if __name__ == "__main__":
         z_weight_options = [0.01]
         learning_rate_options = [5e-3]
         dropout_options = [0.1]
-        batch_size_options = [real_batch_size*200]  # , real_batch_size*1000]
+        batch_size_options = [real_batch_size*200]
     else:
         emb_h1_options = [128]
         emb_h2_options = [32]
@@ -470,8 +414,6 @@ if __name__ == "__main__":
                                     batch_size_counter += 1
                                     if batch_size_counter == batches_needed_for_effective_size or batch_i == train_batch_length - 1:
                                         optimizer.step()
-                                        # scaler.step(optimizer)
-                                        # scaler.update()
                                         optimizer.zero_grad()
                                         batch_size_counter = 0
 
@@ -484,30 +426,10 @@ if __name__ == "__main__":
                                             start_time = time.time()
                                             batch_count = 0
 
-                                        # if current_effective_batch % 100 == 0: #int(effective_num_batches / 2):
-                                        #     dev_loss, dev_auc, dev_mae, all_labels, all_preds = evaluate(dev_loader, model, z_weight, return_outputs=True)
-
-                                        #     dev_loss = float(dev_loss)
-                                        #     print("epoch", epoch, "batch", current_effective_batch, "dev loss:", dev_loss, "patience used:", patience_used, "/", patience, "dev auc:", dev_auc, "dev mae:", dev_mae, flush=True)
-
-                                        #     save_model_and_predictions(model, all_labels, all_preds, out_modifier=str(epoch)+"_"+str(current_effective_batch)+"_"+str(dev_loss))
-                                        #     model = model.to(device)
-                                        #     # if best_loss is None or dev_loss < best_loss:
-                                        #     #     patience_used = 0
-                                        #     #     best_loss = dev_loss
-                                        #     # else:
-                                        #     #     patience_used += 1
-                                        #     #     if patience_used >= patience:
-                                        #     #         break  # end training
-
-
                                 dev_loss, dev_auc, dev_mae, all_labels, all_preds = evaluate(dev_loader, model, z_weight, return_outputs=True)
 
                                 dev_loss = float(dev_loss)
                                 print("epoch", epoch, "dev loss:", dev_loss, "patience used:", patience_used, "/", patience, "dev auc:", dev_auc, "dev mae:", dev_mae, flush=True)
-
-                                # save_model_and_predictions(model, all_labels, all_preds, out_modifier=str(epoch)+"_"+str(dev_loss))
-                                # model = model.to(device)
 
                                 if best_loss is None or dev_loss < best_loss:
                                     patience_used = 0
@@ -548,6 +470,3 @@ if __name__ == "__main__":
         print("test loss:", test_loss, "test auc:", test_auc, "test mae:", test_mae, flush=True)
 
         save_model_and_predictions(model, all_labels, all_preds, out_modifier="best_mae_"+str(best_parameters_mae).replace(" ", ""))
-
-    # else:
-    #     save_model_and_predictions(model, all_labels, all_preds)
