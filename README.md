@@ -44,11 +44,15 @@ If you would like to run our neural embedding similarity variant of DAS3H or the
 
 ## Encoding features for DAS3H
 
-If you are using DKT or the neural embedding similarity approaches, you can skip this step.
+If you are using DKT, you can skip this step.
 
 To encode data for our das3h models without word embeddings, use the following command (using src/das3h/fast_encode.py). Note that again the --lemma and --tags options are optional. Note that this script expects the preprocessed data to be in the src/das3h/data/duolingo_hlr/ directory. The outputs will also be saved to this directory.
 
     python fast_encode.py --dataset duolingo_hlr --tw --continuous_correct --continuous_wins --users --items --skills --l1 --max_history_len 200 --tags --lemma
+    
+To encode data for our das3h neural embedding variant, use the following command (using src/das3h/fast_encode_embeddings.py). This relies on all_word_embeddings_fastword.csv, which is created by process_fastword_embeddings (described above).
+
+    python fast_encode_embeddings.py all_word_embeddings_fastword.csv --dataset duolingo_hlr --tw --continuous_correct --continuous_wins --users --items --skills --l1 --tags --lemma
      
 To encode data using subwords use the following command (using src/das3h/fast_encode.py). You can change the vocab_size and nbest options to match what you chose when training the subword tokenizers.
 
